@@ -1,0 +1,70 @@
+clear;
+binaryCpm = (1:2)';
+fail = 2; survive = 1;
+
+Cx = binaryCpm;
+nX = 4;
+for iXIndex = 1:(nX-1)
+    Cx = [repmat(Cx, 2, 1 ) repelem( binaryCpm, size(Cx,1), 1 )];
+end
+
+px = zeros( size(Cx,1), 1 );
+for iRowIndex = 1:length(px)
+    iNSurviveComp = sum( Cx(iRowIndex,:) == survive );
+    switch iNSurviveComp
+        case 0
+            px( iRowIndex ) = 0.01;
+        case 1
+            px( iRowIndex ) = 0.01;
+        case 2
+             px( iRowIndex ) = 0.02;
+        case 3
+             px( iRowIndex ) = 0.04;
+        case 4
+             px( iRowIndex ) = 0.67;
+    end
+end
+
+varIndex.X = 1:nX;
+iVarIndex = nX;
+for iXIndex = 1:nX
+    vInfo( iXIndex,1 ) = varsInfo( eye(2) );
+end
+
+cpm(1) = Cpm( 1:nX, nX, Cx, px );
+
+
+nEdge = nX;
+edgeBNAdj = zeros( nEdge );
+edgeBNAdj( [1 2], 3 ) = 1; edgeBNAdj(3,4) = 1;
+
+for iEdgeIndex = 1:nEdge
+    iVarIndex = iVarIndex + 1;
+    vInfo( iVarIndex ) = varsInfo( eye(2) );
+    
+    varIndex.Edge( iEdgeIndex ) = iVarIndex;
+    iParentEdgeArray = find( edgeBNAdj( :, iEdgeIndex ) );
+    iCondVarArray = [ varIndex.Edge(iParentEdgeArray) varIndex.X( iEdgeIndex ) ];
+    
+    iCeParent = binaryCpm;
+    for jCondVarIndex = 1:length( iParentEdgeArray )
+        iCeParent = [repmat(iCeParent, 2, 1 ) repelem( binaryCpm, size(iCeParent,1), 1 )];
+    end
+    if size( iCeParent, 2 ) > 1
+        iSurviveEvent = any( iCeParent( :,1:(end-1) ) == survive, 2 ) & ( iCeParent( :, end ) == survive );
+    else
+        iSurviveEvent = ( iCeParent == survive );
+    end
+    iCe = fail * ones( size( iSurviveEvent ) );
+    iCe( iSurviveEvent ) = survive;
+    iPe = ones( size(iCe) );    
+    
+    iCpm = Cpm( [iVarIndex iCondVarArray], 1, [iCe iCeParent], iPe );
+    
+    cpm = [cpm; iCpm];
+end
+
+cpmJoint = multCPMs( cpm, vInfo );
+
+varToLeave = varIndex.Edge(2);
+cpmVarToLeave = sum( cpmJoint, varToLeave, 0 );
